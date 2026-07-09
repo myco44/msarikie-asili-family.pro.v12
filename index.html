@@ -1,0 +1,1102 @@
+<!DOCTYPE html>
+<html lang="sw">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Msarikie Asili Pro</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,400;0,9..144,600;0,9..144,700;0,9..144,900;1,9..144,500&family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<script src="https://cdn.tailwindcss.com"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.13.0/firebase-storage-compat.js"></script>
+<style>
+  :root{
+    --ink:#0F1B2B;        /* night indigo */
+    --ink-2:#182A42;
+    --ink-3:#22375696;
+    --gold:#D9A441;       /* fire/unity amber */
+    --gold-2:#F0C777;
+    --bone:#F6F1E7;       /* warm paper */
+    --leaf:#4C7A5A;       /* accent green - growth/lineage */
+    --clay:#B4553A;       /* alerts */
+  }
+  *{box-sizing:border-box}
+  body{font-family:'Inter',sans-serif; background:var(--ink); color:var(--bone);}
+  .font-display{font-family:'Fraunces',serif;}
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-thumb{background:#3a4f6f;border-radius:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+
+  .circle-mark{
+    width:44px;height:44px;border-radius:9999px;
+    background:
+      radial-gradient(circle at 50% 50%, transparent 0 34%, var(--gold) 34% 38%, transparent 38% 46%, var(--gold-2) 46% 50%, transparent 50% 100%);
+    border:1.5px solid var(--gold);
+    position:relative;
+  }
+  .circle-mark::after{
+    content:"";position:absolute;inset:0;margin:auto;width:8px;height:8px;border-radius:9999px;background:var(--gold);
+  }
+
+  .glass{
+    background:linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.015));
+    border:1px solid rgba(255,255,255,0.09);
+  }
+  .btn-gold{
+    background:linear-gradient(180deg,var(--gold-2),var(--gold));
+    color:#241705; font-weight:700;
+  }
+  .btn-gold:hover{filter:brightness(1.06)}
+  .btn-ghost{
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.14); color:var(--bone);
+  }
+  .btn-ghost:hover{background:rgba(255,255,255,0.1)}
+  .input-field{
+    background:rgba(255,255,255,0.06); border:1px solid rgba(255,255,255,0.16);
+    color:var(--bone); border-radius:10px;
+  }
+  .input-field:focus{outline:none; border-color:var(--gold); box-shadow:0 0 0 3px rgba(217,164,65,0.18)}
+  .input-field::placeholder{color:#9fb0c7}
+
+  .nav-item{transition:.15s ease; border-left:3px solid transparent;}
+  .nav-item.active{background:rgba(217,164,65,0.12); border-left-color:var(--gold); color:var(--gold-2);}
+  .nav-item:hover{background:rgba(255,255,255,0.05);}
+
+  .badge{font-size:11px;font-weight:700;letter-spacing:.04em;padding:2px 9px;border-radius:999px;}
+  .pulse-dot{animation:pulse 1.6s infinite}
+  @keyframes pulse{0%,100%{opacity:1}50%{opacity:.35}}
+  .fade-in{animation:fadeIn .35s ease both}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .scrollpane{max-height:100%;overflow-y:auto}
+  #app{min-height:100vh}
+  .hairline{border-color:rgba(255,255,255,0.1)}
+</style>
+</head>
+<body>
+<div id="app" class="flex items-center justify-center">
+  <div class="text-center fade-in">
+    <div class="circle-mark mx-auto mb-4"></div>
+    <p class="text-sm tracking-widest text-[#9fb0c7]">MSARIKIE ASILI PRO</p>
+  </div>
+</div>
+
+<script>
+/* =========================================================
+   FIREBASE CONFIG
+========================================================= */
+const firebaseConfig = {
+  apiKey: "AIzaSyDAPa8FmzPxB0s3KFaitVb0HLINy29Ummw",
+  authDomain: "familia-ya-msarikie.firebaseapp.com",
+  projectId: "familia-ya-msarikie",
+  storageBucket: "familia-ya-msarikie.firebasestorage.app",
+  messagingSenderId: "81432971168",
+  appId: "1:81432971168:web:a11339a12e4652714306c5"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.firestore();
+const storage = firebase.storage();
+
+/* =========================================================
+   ROLE PINS
+========================================================= */
+const ROLE_PINS = {
+  "MWK771199": "Mwenyekiti",
+  "KTB555288": "Katibu Mkuu",
+  "MHZ224664": "Mhazini"
+};
+const ROLE_COLORS = {
+  "Mwenyekiti": "#D9A441",
+  "Katibu Mkuu": "#4C7A5A",
+  "Mhazini": "#7AA7D9",
+  "Mwanachama": "#9fb0c7"
+};
+
+/* =========================================================
+   STATE
+========================================================= */
+let CURRENT_USER = null;   // firebase auth user
+let PROFILE = null;        // firestore users/{uid} doc
+let ACTIVE_TAB = "home";
+let UNSUBS = [];            // active firestore listeners to clean up
+
+const app = document.getElementById("app");
+
+function clearListeners(){
+  UNSUBS.forEach(u => { try{ u(); }catch(e){} });
+  UNSUBS = [];
+}
+
+/* =========================================================
+   AUTH STATE
+========================================================= */
+auth.onAuthStateChanged(async (user) => {
+  clearListeners();
+  if (user) {
+    CURRENT_USER = user;
+    const doc = await db.collection("users").doc(user.uid).get();
+    if (doc.exists) {
+      PROFILE = doc.data();
+      renderDashboard();
+    } else {
+      // Auth exists but no profile - force re-login flow
+      renderAuthScreen();
+    }
+  } else {
+    CURRENT_USER = null;
+    PROFILE = null;
+    renderAuthScreen();
+  }
+});
+
+/* =========================================================
+   AUTH SCREEN
+========================================================= */
+function renderAuthScreen(mode = "login") {
+  app.className = "flex items-center justify-center min-h-screen px-4";
+  app.innerHTML = `
+  <div class="w-full max-w-md fade-in">
+    <div class="text-center mb-8">
+      <div class="circle-mark mx-auto mb-4"></div>
+      <h1 class="font-display text-3xl font-semibold tracking-tight">Msarikie Asili</h1>
+      <p class="text-[#9fb0c7] text-sm mt-1">Baraza la Ukoo &middot; Mfumo wa Familia</p>
+    </div>
+
+    <div class="glass rounded-2xl p-6">
+      <div class="flex mb-6 rounded-xl overflow-hidden border border-white/10">
+        <button id="tabLogin" class="flex-1 py-2.5 text-sm font-semibold ${mode==='login'?'btn-gold':'bg-transparent text-[#9fb0c7]'}">Ingia</button>
+        <button id="tabSignup" class="flex-1 py-2.5 text-sm font-semibold ${mode==='signup'?'btn-gold':'bg-transparent text-[#9fb0c7]'}">Jisajili</button>
+      </div>
+
+      <div id="authFormWrap"></div>
+      <p id="authMsg" class="text-sm mt-4 text-center"></p>
+    </div>
+    <p class="text-center text-xs text-[#63769a] mt-6">imeundwa na michael joseph kavishe.</p>
+  </div>`;
+
+  document.getElementById("tabLogin").onclick = () => renderAuthScreen("login");
+  document.getElementById("tabSignup").onclick = () => renderAuthScreen("signup");
+
+  const wrap = document.getElementById("authFormWrap");
+  if (mode === "login") {
+    wrap.innerHTML = `
+      <div class="space-y-3">
+        <input id="loginEmail" type="email" placeholder="Barua pepe" class="input-field w-full px-4 py-2.5 text-sm">
+        <input id="loginPass" type="password" placeholder="Nywila" class="input-field w-full px-4 py-2.5 text-sm">
+        <button id="loginBtn" class="btn-gold w-full py-2.5 rounded-lg text-sm mt-2">Ingia Ukoni</button>
+      </div>`;
+    document.getElementById("loginBtn").onclick = doLogin;
+  } else {
+    wrap.innerHTML = `
+      <div class="space-y-3">
+        <input id="suName" type="text" placeholder="Jina lako kamili" class="input-field w-full px-4 py-2.5 text-sm">
+        <input id="suEmail" type="email" placeholder="Barua pepe" class="input-field w-full px-4 py-2.5 text-sm">
+        <input id="suPass" type="password" placeholder="Nywila (angalau herufi 6)" class="input-field w-full px-4 py-2.5 text-sm">
+        <input id="suPin" type="text" placeholder="PIN ya Uongozi (kama upo)" class="input-field w-full px-4 py-2.5 text-sm">
+        <p class="text-xs text-[#63769a] px-1">Acha wazi kama wewe ni Mwanachama wa kawaida.</p>
+        <button id="signupBtn" class="btn-gold w-full py-2.5 rounded-lg text-sm mt-2">Jiunge na Ukoo</button>
+      </div>`;
+    document.getElementById("signupBtn").onclick = doSignup;
+  }
+}
+
+async function doLogin() {
+  const email = document.getElementById("loginEmail").value.trim();
+  const pass = document.getElementById("loginPass").value;
+  const msg = document.getElementById("authMsg");
+  if (!email || !pass) { msg.textContent = "Jaza barua pepe na nywila."; msg.className="text-sm mt-4 text-center text-[#D97757]"; return; }
+  msg.textContent = "Inaingia...";
+  msg.className = "text-sm mt-4 text-center text-[#9fb0c7]";
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch (e) {
+    msg.textContent = friendlyAuthError(e);
+    msg.className = "text-sm mt-4 text-center text-[#D97757]";
+  }
+}
+
+async function doSignup() {
+  const name = document.getElementById("suName").value.trim();
+  const email = document.getElementById("suEmail").value.trim();
+  const pass = document.getElementById("suPass").value;
+  const pin = document.getElementById("suPin").value.trim().toUpperCase();
+  const msg = document.getElementById("authMsg");
+
+  if (!name || !email || !pass) { msg.textContent = "Jaza sehemu zote muhimu."; msg.className="text-sm mt-4 text-center text-[#D97757]"; return; }
+  if (pass.length < 6) { msg.textContent = "Nywila iwe angalau herufi 6."; msg.className="text-sm mt-4 text-center text-[#D97757]"; return; }
+
+  let role = "Mwanachama";
+  if (pin) {
+    if (ROLE_PINS[pin]) { role = ROLE_PINS[pin]; }
+    else { msg.textContent = "PIN ya uongozi si sahihi."; msg.className="text-sm mt-4 text-center text-[#D97757]"; return; }
+  }
+
+  msg.textContent = "Inaunda akaunti...";
+  msg.className = "text-sm mt-4 text-center text-[#9fb0c7]";
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await db.collection("users").doc(cred.user.uid).set({
+      name, email, role,
+      photoURL: "",
+      securityPin: "",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  } catch (e) {
+    msg.textContent = friendlyAuthError(e);
+    msg.className = "text-sm mt-4 text-center text-[#D97757]";
+  }
+}
+
+function friendlyAuthError(e) {
+  const code = e.code || "";
+  if (code.includes("email-already-in-use")) return "Barua pepe hii tayari imesajiliwa.";
+  if (code.includes("invalid-email")) return "Barua pepe si sahihi.";
+  if (code.includes("wrong-password") || code.includes("invalid-credential")) return "Nywila au barua pepe si sahihi.";
+  if (code.includes("user-not-found")) return "Akaunti haipo. Jisajili kwanza.";
+  if (code.includes("weak-password")) return "Nywila ni dhaifu, weka angalau herufi 6.";
+  return "Hitilafu imetokea. Jaribu tena.";
+}
+
+/* =========================================================
+   DASHBOARD SHELL
+========================================================= */
+const NAV_ITEMS = [
+  { id: "home", label: "Nyumbani", icon: "" },
+  { id: "vikao", label: "Vikao", icon: "" },
+  { id: "fedha", label: "Fedha", icon: "" },
+  { id: "sos", label: "SOS", icon: "" },
+  { id: "chat", label: "Mazungumzo", icon: "" },
+  { id: "kurasa", label: "Kurasa Zetu", icon: "" },
+  { id: "profile", label: "Wasifu Wangu", icon: "" },
+];
+
+function isLeader() {
+  return PROFILE && ["Mwenyekiti","Katibu Mkuu","Mhazini"].includes(PROFILE.role);
+}
+
+function renderDashboard() {
+  ACTIVE_TAB = "home";
+  app.className = "min-h-screen flex";
+  app.innerHTML = `
+    <aside id="sidebar" class="hidden md:flex flex-col w-64 shrink-0 border-r hairline bg-[#0c1524]">
+      ${sidebarContent()}
+    </aside>
+
+    <div class="flex-1 flex flex-col min-w-0">
+      <header class="flex items-center justify-between px-4 md:px-8 py-4 border-b hairline bg-[#0c1524]/60 backdrop-blur">
+        <div class="flex items-center gap-3">
+          <button id="mobileMenuBtn" class="md:hidden text-xl"></button>
+          <div>
+            <p class="text-xs text-[#9fb0c7]">Karibu,</p>
+            <p class="font-display font-semibold text-lg leading-tight">${PROFILE.name}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-3">
+          <span class="badge" style="background:${ROLE_COLORS[PROFILE.role]}22; color:${ROLE_COLORS[PROFILE.role]}; border:1px solid ${ROLE_COLORS[PROFILE.role]}55">${PROFILE.role}</span>
+          <button id="logoutBtn" class="btn-ghost text-xs px-3 py-1.5 rounded-lg">Toka</button>
+        </div>
+      </header>
+
+      <div id="alertBanner"></div>
+
+      <main id="mainContent" class="flex-1 overflow-y-auto p-4 md:p-8"></main>
+    </div>
+
+    <div id="mobileNavOverlay" class="hidden fixed inset-0 z-40 bg-black/60"></div>
+    <div id="mobileNav" class="hidden fixed left-0 top-0 bottom-0 w-64 z-50 bg-[#0c1524] flex flex-col">
+      ${sidebarContent()}
+    </div>
+  `;
+
+  document.getElementById("logoutBtn").onclick = () => auth.signOut();
+  bindNav();
+  document.getElementById("mobileMenuBtn").onclick = () => {
+    document.getElementById("mobileNav").classList.remove("hidden");
+    document.getElementById("mobileNavOverlay").classList.remove("hidden");
+  };
+  document.getElementById("mobileNavOverlay").onclick = closeMobileNav;
+
+  listenAlerts();
+  listenBadges();
+  goTo("home");
+}
+
+function setBadge(id, count) {
+  document.querySelectorAll(`[data-badge="${id}"]`).forEach(el => {
+    if (count > 0) {
+      el.textContent = count > 99 ? "99+" : count;
+      el.classList.remove("hidden");
+      el.classList.add("flex");
+    } else {
+      el.classList.add("hidden");
+      el.classList.remove("flex");
+    }
+  });
+}
+
+function listenBadges() {
+  if (isLeader()) {
+    const unsubSos = db.collection("sos").where("status","==","wazi").onSnapshot(snap => setBadge("sos", snap.size));
+    UNSUBS.push(unsubSos);
+  }
+  if (PROFILE.role === "Mhazini") {
+    const unsubTx = db.collection("transactions").where("status","==","pending").onSnapshot(snap => setBadge("fedha", snap.size));
+    UNSUBS.push(unsubTx);
+  }
+}
+
+function closeMobileNav(){
+  document.getElementById("mobileNav").classList.add("hidden");
+  document.getElementById("mobileNavOverlay").classList.add("hidden");
+}
+
+function sidebarContent() {
+  return `
+    <div class="p-6 flex items-center gap-3 border-b hairline">
+      <div class="circle-mark"></div>
+      <div>
+        <p class="font-display font-semibold text-base leading-tight">Msarikie Asili</p>
+        <p class="text-[10px] text-[#63769a] tracking-wide">BARAZA LA UKOO</p>
+      </div>
+    </div>
+    <nav class="flex-1 py-4 space-y-1">
+      ${NAV_ITEMS.map(item => `
+        <button data-nav="${item.id}" class="nav-item w-full flex items-center gap-3 px-6 py-3 text-sm text-left">
+          <span>${item.icon}</span><span class="flex-1">${item.label}</span>
+          ${(item.id === 'sos' || item.id === 'fedha') ? `<span data-badge="${item.id}" class="hidden text-[10px] font-bold text-white bg-[#B4553A] rounded-full min-w-[18px] h-[18px] px-1 items-center justify-center"></span>` : ""}
+        </button>`).join("")}
+      ${isLeader() ? `
+        <div class="px-6 pt-4 pb-2 text-[10px] tracking-widest text-[#63769a]">UONGOZI</div>
+        <button data-nav="usimamizi" class="nav-item w-full flex items-center gap-3 px-6 py-3 text-sm text-left">
+          <span></span><span>Paneli ya Uongozi</span>
+        </button>` : ""}
+    </nav>
+    <div class="p-4 border-t hairline">
+      <button data-nav="usalama" class="nav-item w-full flex items-center gap-3 px-4 py-2.5 text-xs text-left rounded-lg">
+        <span></span><span>Usalama wa Akaunti</span>
+      </button>
+    </div>
+  `;
+}
+
+function bindNav() {
+  document.querySelectorAll("[data-nav]").forEach(btn => {
+    btn.onclick = () => { goTo(btn.dataset.nav); closeMobileNav(); };
+  });
+}
+
+function goTo(tab) {
+  ACTIVE_TAB = tab;
+  document.querySelectorAll("[data-nav]").forEach(b => {
+    b.classList.toggle("active", b.dataset.nav === tab);
+  });
+  const renderers = {
+    home: renderHome,
+    vikao: renderVikao,
+    fedha: renderFedha,
+    sos: renderSOS,
+    chat: renderChat,
+    kurasa: renderKurasa,
+    profile: renderProfile,
+    usalama: renderUsalama,
+    usimamizi: renderUsimamizi,
+  };
+  const fn = renderers[tab] || renderHome;
+  fn();
+}
+
+/* =========================================================
+   ALERT BANNER (Emergency broadcasts from Mwenyekiti)
+========================================================= */
+function listenAlerts() {
+  const unsub = db.collection("announcements").orderBy("createdAt", "desc").limit(1)
+    .onSnapshot(snap => {
+      const banner = document.getElementById("alertBanner");
+      if (!banner) return;
+      if (snap.empty) { banner.innerHTML = ""; return; }
+      const a = snap.docs[0].data();
+      const aId = snap.docs[0].id;
+      const ageMs = a.createdAt ? Date.now() - a.createdAt.toDate().getTime() : 0;
+      if (ageMs > 1000 * 60 * 60 * 24) { banner.innerHTML = ""; return; } // hide after 24h
+      banner.innerHTML = `
+        <div class="bg-[#B4553A] text-white px-4 md:px-8 py-3 flex items-center gap-3 fade-in">
+          <span class="pulse-dot text-lg"></span>
+          <p class="text-sm font-medium flex-1">${escapeHtml(a.message)}</p>
+          ${PROFILE.role === "Mwenyekiti" ? `<button id="delAnnounceBtn" class="text-xs underline opacity-90">Futa</button>` : ""}
+        </div>`;
+      const delBtn = document.getElementById("delAnnounceBtn");
+      if (delBtn) delBtn.onclick = () => db.collection("announcements").doc(aId).delete();
+    });
+  UNSUBS.push(unsub);
+}
+
+/* =========================================================
+   HOME
+========================================================= */
+async function renderHome() {
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="fade-in space-y-6">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">Nyumbani</h2>
+      <p class="text-[#9fb0c7] text-sm mt-1">Muhtasari wa haraka wa ukoo wetu.</p>
+    </div>
+    <div id="homeCards" class="grid grid-cols-1 md:grid-cols-3 gap-4"></div>
+    <div class="glass rounded-2xl p-5">
+      <h3 class="font-semibold mb-3 text-sm text-[#9fb0c7]">Kikao cha Sasa</h3>
+      <div id="homeMeetingCard">Inapakia...</div>
+    </div>
+  </div>`;
+
+  const cardsWrap = document.getElementById("homeCards");
+  cardsWrap.innerHTML = `
+    <div class="glass rounded-2xl p-5">
+      <p class="text-xs text-[#9fb0c7]">Mfuko wa Ukoo</p>
+      <p id="homeFundVal" class="font-display text-3xl font-semibold mt-2">...</p>
+    </div>
+    <div class="glass rounded-2xl p-5">
+      <p class="text-xs text-[#9fb0c7]">Ripoti za SOS Wazi</p>
+      <p id="homeSosVal" class="font-display text-3xl font-semibold mt-2">...</p>
+    </div>
+    <div class="glass rounded-2xl p-5">
+      <p class="text-xs text-[#9fb0c7]">Wanachama</p>
+      <p id="homeMembersVal" class="font-display text-3xl font-semibold mt-2">...</p>
+    </div>
+  `;
+
+  // Fund total
+  const unsub1 = db.collection("transactions").where("status","==","approved")
+    .onSnapshot(snap => {
+      let total = 0;
+      snap.forEach(d => {
+        const t = d.data();
+        total += t.type === "mchango" ? Number(t.amount||0) : -Number(t.amount||0);
+      });
+      const el = document.getElementById("homeFundVal");
+      if (el) el.textContent = "TSh " + total.toLocaleString();
+    });
+  UNSUBS.push(unsub1);
+
+  // SOS open count
+  const unsub2 = db.collection("sos").where("status","==","wazi")
+    .onSnapshot(snap => {
+      const el = document.getElementById("homeSosVal");
+      if (el) el.textContent = snap.size;
+    });
+  UNSUBS.push(unsub2);
+
+  // Members count
+  const unsub3 = db.collection("users").onSnapshot(snap => {
+    const el = document.getElementById("homeMembersVal");
+    if (el) el.textContent = snap.size;
+  });
+  UNSUBS.push(unsub3);
+
+  // Meeting card
+  const unsub4 = db.collection("meetings").doc("current").onSnapshot(doc => {
+    const el = document.getElementById("homeMeetingCard");
+    if (!el) return;
+    if (!doc.exists || !doc.data().active) {
+      el.innerHTML = `<p class="text-sm text-[#9fb0c7]">Hakuna kikao kinachoendelea sasa hivi.</p>`;
+      return;
+    }
+    const m = doc.data();
+    el.innerHTML = `
+      <p class="text-sm mb-3"><span class="pulse-dot"></span> Kikao kinaendelea sasa</p>
+      <a href="${m.link}" target="_blank" class="btn-gold inline-block px-5 py-2.5 rounded-lg text-sm">Jiunge na Kikao</a>
+    `;
+  });
+  UNSUBS.push(unsub4);
+}
+
+/* =========================================================
+   VIKAO (Meetings)
+========================================================= */
+function renderVikao() {
+  const main = document.getElementById("mainContent");
+  const canManage = PROFILE.role === "Katibu Mkuu" || PROFILE.role === "Mwenyekiti";
+  main.innerHTML = `<div class="fade-in space-y-6 max-w-3xl">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">Vikao vya Ukoo</h2>
+      <p class="text-[#9fb0c7] text-sm mt-1">Simamia mikutano ya video, ajenda na muhtasari.</p>
+    </div>
+
+    <div class="glass rounded-2xl p-5" id="meetingStatusCard">Inapakia...</div>
+
+    ${canManage ? `
+    <div class="glass rounded-2xl p-5 space-y-3">
+      <h3 class="font-semibold text-sm text-[#9fb0c7]">Simamia Kikao (${PROFILE.role})</h3>
+      <input id="meetLink" type="url" placeholder="Weka Link ya Google Meet / Zoom" class="input-field w-full px-4 py-2.5 text-sm">
+      <textarea id="meetAgenda" placeholder="Ajenda ya kikao..." class="input-field w-full px-4 py-2.5 text-sm" rows="2"></textarea>
+      <div class="flex flex-wrap gap-3">
+        <button id="startMeetBtn" class="btn-gold px-4 py-2 rounded-lg text-sm">Anzisha Kikao</button>
+        <button id="endMeetBtn" class="btn-ghost px-4 py-2 rounded-lg text-sm">Funga Kikao</button>
+      </div>
+    </div>` : ""}
+
+    <div class="glass rounded-2xl p-5 space-y-3">
+      <h3 class="font-semibold text-sm text-[#9fb0c7]">Muhtasari wa Vikao Vilivyopita</h3>
+      <div id="minutesList" class="space-y-3 text-sm"></div>
+      ${canManage ? `
+      <div class="pt-3 border-t hairline space-y-2">
+        <textarea id="newMinute" placeholder="Andika muhtasari mpya wa kikao..." class="input-field w-full px-4 py-2.5 text-sm" rows="2"></textarea>
+        <button id="saveMinuteBtn" class="btn-ghost px-4 py-2 rounded-lg text-sm">Hifadhi Muhtasari</button>
+      </div>` : ""}
+    </div>
+  </div>`;
+
+  const unsub = db.collection("meetings").doc("current").onSnapshot(doc => {
+    const card = document.getElementById("meetingStatusCard");
+    if (!card) return;
+    const m = doc.exists ? doc.data() : {};
+    if (m.active) {
+      card.innerHTML = `
+        <p class="text-sm mb-2"><span class="pulse-dot"></span> <strong>Kikao kinaendelea</strong></p>
+        ${m.agenda ? `<p class="text-sm text-[#9fb0c7] mb-3">Ajenda: ${escapeHtml(m.agenda)}</p>` : ""}
+        <a href="${m.link || '#'}" target="_blank" class="btn-gold inline-block px-5 py-2.5 rounded-lg text-sm">Jiunge na Kikao</a>
+      `;
+    } else {
+      card.innerHTML = `<p class="text-sm text-[#9fb0c7]"><span class="opacity-60"></span> Hakuna kikao kinachoendelea. Subiri tangazo la Katibu au Mwenyekiti.</p>`;
+    }
+  });
+  UNSUBS.push(unsub);
+
+  const unsubMin = db.collection("minutes").orderBy("createdAt","desc").limit(10).onSnapshot(snap => {
+    const list = document.getElementById("minutesList");
+    if (!list) return;
+    if (snap.empty) { list.innerHTML = `<p class="text-[#63769a] text-sm">Bado hakuna muhtasari uliohifadhiwa.</p>`; return; }
+    list.innerHTML = snap.docs.map(d => {
+      const m = d.data();
+      const date = m.createdAt ? m.createdAt.toDate().toLocaleDateString('sw-TZ') : "";
+      return `<div class="border-b hairline pb-3">
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs text-[#63769a] mb-1">${date}</p>
+          ${canManage ? `<button data-delmin="${d.id}" class="text-[10px] text-[#B4553A] hover:underline">Futa</button>` : ""}
+        </div>
+        <p>${escapeHtml(m.text)}</p>
+      </div>`;
+    }).join("");
+    if (canManage) {
+      list.querySelectorAll("[data-delmin]").forEach(b => {
+        b.onclick = () => { if (confirm("Futa muhtasari huu?")) db.collection("minutes").doc(b.dataset.delmin).delete(); };
+      });
+    }
+  });
+  UNSUBS.push(unsubMin);
+
+  if (canManage) {
+    document.getElementById("startMeetBtn").onclick = async () => {
+      const link = document.getElementById("meetLink").value.trim();
+      const agenda = document.getElementById("meetAgenda").value.trim();
+      if (!link) { alert("Weka link ya kikao kwanza."); return; }
+      await db.collection("meetings").doc("current").set({
+        active: true, link, agenda,
+        startedBy: PROFILE.name, startedAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+    };
+    document.getElementById("endMeetBtn").onclick = async () => {
+      await db.collection("meetings").doc("current").set({ active: false }, { merge: true });
+    };
+    document.getElementById("saveMinuteBtn").onclick = async () => {
+      const text = document.getElementById("newMinute").value.trim();
+      if (!text) return;
+      await db.collection("minutes").add({
+        text, author: PROFILE.name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      document.getElementById("newMinute").value = "";
+    };
+  }
+}
+
+/* =========================================================
+   FEDHA (Finance)
+========================================================= */
+function renderFedha() {
+  const main = document.getElementById("mainContent");
+  const isMhazini = PROFILE.role === "Mhazini";
+  main.innerHTML = `<div class="fade-in space-y-6 max-w-4xl">
+    <div class="flex items-center justify-between flex-wrap gap-3">
+      <div>
+        <h2 class="font-display text-2xl font-semibold">Fedha za Ukoo</h2>
+        <p class="text-[#9fb0c7] text-sm mt-1">Mfuko mkuu, michango na matumizi.</p>
+      </div>
+      <div class="glass rounded-xl px-5 py-3 text-right">
+        <p class="text-xs text-[#9fb0c7]">Salio la Mfuko</p>
+        <p id="fundBalance" class="font-display text-2xl font-semibold">...</p>
+      </div>
+    </div>
+
+    <div class="glass rounded-2xl p-5 space-y-3">
+      <h3 class="font-semibold text-sm text-[#9fb0c7]">Tuma Muamala</h3>
+      <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        <select id="txType" class="input-field px-3 py-2.5 text-sm">
+          <option value="mchango">Mchango (Pesa Inaingia)</option>
+          <option value="matumizi">Matumizi (Pesa Inatoka)</option>
+        </select>
+        <input id="txAmount" type="number" placeholder="Kiasi (TSh)" class="input-field px-3 py-2.5 text-sm">
+        <input id="txDesc" type="text" placeholder="Maelezo" class="input-field px-3 py-2.5 text-sm">
+      </div>
+      <button id="txSubmitBtn" class="btn-gold px-4 py-2 rounded-lg text-sm">Tuma kwa Uhakiki</button>
+    </div>
+
+    ${isMhazini ? `
+    <div class="glass rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-sm text-[#9fb0c7]">Miamala Inayosubiri Uhakiki (Mhazini)</h3>
+        <button id="clearTxBtn" class="text-xs text-[#B4553A] hover:underline">Futa Rekodi Zote</button>
+      </div>
+      <div id="pendingTxList" class="space-y-2"></div>
+    </div>` : ""}
+
+    <div class="glass rounded-2xl p-5">
+      <h3 class="font-semibold text-sm text-[#9fb0c7] mb-3">Historia ya Miamala</h3>
+      <div id="allTxList" class="space-y-2 text-sm"></div>
+    </div>
+  </div>`;
+
+  document.getElementById("txSubmitBtn").onclick = async () => {
+    const type = document.getElementById("txType").value;
+    const amount = Number(document.getElementById("txAmount").value);
+    const desc = document.getElementById("txDesc").value.trim();
+    if (!amount || amount <= 0) { alert("Weka kiasi sahihi."); return; }
+    await db.collection("transactions").add({
+      type, amount, description: desc,
+      submittedBy: CURRENT_USER.uid, submittedByName: PROFILE.name,
+      status: "pending",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById("txAmount").value = "";
+    document.getElementById("txDesc").value = "";
+  };
+
+  const unsubBal = db.collection("transactions").where("status","==","approved").onSnapshot(snap => {
+    let total = 0;
+    snap.forEach(d => {
+      const t = d.data();
+      total += t.type === "mchango" ? Number(t.amount||0) : -Number(t.amount||0);
+    });
+    const el = document.getElementById("fundBalance");
+    if (el) el.textContent = "TSh " + total.toLocaleString();
+  });
+  UNSUBS.push(unsubBal);
+
+  if (isMhazini) {
+    const unsubPending = db.collection("transactions").where("status","==","pending")
+      .orderBy("createdAt","desc").onSnapshot(snap => {
+        const list = document.getElementById("pendingTxList");
+        if (!list) return;
+        if (snap.empty) { list.innerHTML = `<p class="text-[#63769a] text-sm">Hakuna miamala inayosubiri.</p>`; return; }
+        list.innerHTML = snap.docs.map(d => {
+          const t = d.data();
+          return `<div class="flex items-center justify-between border-b hairline pb-2 gap-2 flex-wrap">
+            <div>
+              <p class="text-sm">${t.type === 'mchango' ? '' : ''} TSh ${Number(t.amount).toLocaleString()} � ${escapeHtml(t.description||'')}</p>
+              <p class="text-xs text-[#63769a]">${escapeHtml(t.submittedByName)}</p>
+            </div>
+            <div class="flex gap-2">
+              <button data-approve="${d.id}" class="btn-gold text-xs px-3 py-1.5 rounded-lg">Idhinisha</button>
+              <button data-reject="${d.id}" class="btn-ghost text-xs px-3 py-1.5 rounded-lg">Kataa</button>
+            </div>
+          </div>`;
+        }).join("");
+        list.querySelectorAll("[data-approve]").forEach(b => {
+          b.onclick = () => db.collection("transactions").doc(b.dataset.approve).update({ status:"approved", approvedBy: PROFILE.name });
+        });
+        list.querySelectorAll("[data-reject]").forEach(b => {
+          b.onclick = () => db.collection("transactions").doc(b.dataset.reject).update({ status:"rejected", approvedBy: PROFILE.name });
+        });
+      });
+    UNSUBS.push(unsubPending);
+
+    document.getElementById("clearTxBtn").onclick = async () => {
+      if (!confirm("Una uhakika unataka kufuta rekodi ZOTE za miamala? Hatua hii haiwezi kurudishwa.")) return;
+      const snap = await db.collection("transactions").get();
+      const batchArr = snap.docs;
+      for (const d of batchArr) { await d.ref.delete(); }
+      alert("Rekodi za miamala zimefutwa.");
+    };
+  }
+
+  const unsubAll = db.collection("transactions").orderBy("createdAt","desc").limit(30).onSnapshot(snap => {
+    const list = document.getElementById("allTxList");
+    if (!list) return;
+    if (snap.empty) { list.innerHTML = `<p class="text-[#63769a] text-sm">Bado hakuna miamala.</p>`; return; }
+    list.innerHTML = snap.docs.map(d => {
+      const t = d.data();
+      const statusColor = t.status === "approved" ? "#4C7A5A" : t.status === "rejected" ? "#B4553A" : "#D9A441";
+      const statusLabel = t.status === "approved" ? "Imeidhinishwa" : t.status === "rejected" ? "Imekataliwa" : "Inasubiri";
+      return `<div class="flex items-center justify-between border-b hairline pb-2 gap-2 flex-wrap">
+        <div>
+          <p>${t.type === 'mchango' ? '' : ''} TSh ${Number(t.amount).toLocaleString()} � ${escapeHtml(t.description||'')}</p>
+          <p class="text-xs text-[#63769a]">${escapeHtml(t.submittedByName)}</p>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge" style="background:${statusColor}22;color:${statusColor};border:1px solid ${statusColor}55">${statusLabel}</span>
+          ${isMhazini ? `<button data-deltx="${d.id}" class="text-[10px] text-[#B4553A] hover:underline">Futa</button>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+    if (isMhazini) {
+      list.querySelectorAll("[data-deltx]").forEach(b => {
+        b.onclick = () => { if (confirm("Futa muamala huu?")) db.collection("transactions").doc(b.dataset.deltx).delete(); };
+      });
+    }
+  });
+  UNSUBS.push(unsubAll);
+}
+
+/* =========================================================
+   SOS
+========================================================= */
+function renderSOS() {
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="fade-in space-y-6 max-w-3xl">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">SOS &mdash; Shida Kubwa</h2>
+      <p class="text-[#9fb0c7] text-sm mt-1">Ripoti dharura au shida binafsi. Uongozi utaona mara moja.</p>
+    </div>
+
+    <div class="glass rounded-2xl p-5 space-y-3">
+      <textarea id="sosMsg" placeholder="Eleza shida yako kwa ufupi..." class="input-field w-full px-4 py-2.5 text-sm" rows="3"></textarea>
+      <button id="sosSendBtn" class="px-4 py-2 rounded-lg text-sm text-white" style="background:#B4553A">Tuma SOS kwa Uongozi</button>
+    </div>
+
+    <div class="glass rounded-2xl p-5">
+      <h3 class="font-semibold text-sm text-[#9fb0c7] mb-3">${isLeader() ? "Ripoti Zote" : "Ripoti Zangu"}</h3>
+      <div id="sosList" class="space-y-3"></div>
+    </div>
+  </div>`;
+
+  document.getElementById("sosSendBtn").onclick = async () => {
+    const message = document.getElementById("sosMsg").value.trim();
+    if (!message) return;
+    await db.collection("sos").add({
+      message, userId: CURRENT_USER.uid, userName: PROFILE.name,
+      status: "wazi", createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+    document.getElementById("sosMsg").value = "";
+  };
+
+  let query = db.collection("sos").orderBy("createdAt","desc");
+  if (!isLeader()) query = db.collection("sos").where("userId","==",CURRENT_USER.uid).orderBy("createdAt","desc");
+
+  const unsub = query.onSnapshot(snap => {
+    const list = document.getElementById("sosList");
+    if (!list) return;
+    if (snap.empty) { list.innerHTML = `<p class="text-[#63769a] text-sm">Hakuna ripoti kwa sasa.</p>`; return; }
+    list.innerHTML = snap.docs.map(d => {
+      const s = d.data();
+      const date = s.createdAt ? s.createdAt.toDate().toLocaleString('sw-TZ') : "";
+      const open = s.status === "wazi";
+      return `<div class="border-b hairline pb-3">
+        <div class="flex items-center justify-between gap-2 flex-wrap">
+          <p class="text-sm font-medium">${escapeHtml(s.userName)}</p>
+          <span class="badge" style="background:${open ? '#B4553A22' : '#4C7A5A22'};color:${open ? '#B4553A' : '#4C7A5A'};border:1px solid ${open ? '#B4553A55' : '#4C7A5A55'}">${open ? 'Wazi' : 'Imetatuliwa'}</span>
+        </div>
+        <p class="text-sm mt-1">${escapeHtml(s.message)}</p>
+        <p class="text-xs text-[#63769a] mt-1">${date}</p>
+        <div class="flex gap-2 mt-2">
+          ${isLeader() && open ? `<button data-resolve="${d.id}" class="btn-ghost text-xs px-3 py-1.5 rounded-lg">Weka Imetatuliwa</button>` : ""}
+          ${isLeader() ? `<button data-delsos="${d.id}" class="text-xs text-[#B4553A] hover:underline px-1">Futa</button>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+    if (isLeader()) {
+      list.querySelectorAll("[data-resolve]").forEach(b => {
+        b.onclick = () => db.collection("sos").doc(b.dataset.resolve).update({ status: "imetatuliwa" });
+      });
+      list.querySelectorAll("[data-delsos]").forEach(b => {
+        b.onclick = () => { if (confirm("Futa ripoti hii ya SOS?")) db.collection("sos").doc(b.dataset.delsos).delete(); };
+      });
+    }
+  });
+  UNSUBS.push(unsub);
+}
+
+/* =========================================================
+   GROUP CHAT
+========================================================= */
+function renderChat() {
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="fade-in h-full flex flex-col max-w-3xl">
+    <div class="mb-4">
+      <h2 class="font-display text-2xl font-semibold">Mazungumzo ya Familia</h2>
+      <p class="text-[#9fb0c7] text-sm mt-1">Chati ya moja kwa moja kati ya wanachama wote.</p>
+    </div>
+    <div id="chatMessages" class="glass rounded-2xl p-4 flex-1 overflow-y-auto space-y-3 mb-3" style="min-height:340px;max-height:52vh"></div>
+    <div class="flex gap-2">
+      <input id="chatInput" type="text" placeholder="Andika ujumbe..." class="input-field flex-1 px-4 py-2.5 text-sm">
+      <button id="chatSendBtn" class="btn-gold px-5 py-2.5 rounded-lg text-sm">Tuma</button>
+    </div>
+  </div>`;
+
+  const send = async () => {
+    const input = document.getElementById("chatInput");
+    const message = input.value.trim();
+    if (!message) return;
+    input.value = "";
+    await db.collection("chat").add({
+      message, userId: CURRENT_USER.uid, userName: PROFILE.name,
+      photoURL: PROFILE.photoURL || "",
+      createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+  };
+  document.getElementById("chatSendBtn").onclick = send;
+  document.getElementById("chatInput").onkeydown = (e) => { if (e.key === "Enter") send(); };
+
+  const unsub = db.collection("chat").orderBy("createdAt","desc").limit(50).onSnapshot(snap => {
+    const box = document.getElementById("chatMessages");
+    if (!box) return;
+    const msgs = snap.docs.map(d => ({ id: d.id, ...d.data() })).reverse();
+    const canDeleteAny = isLeader();
+    box.innerHTML = msgs.map(m => {
+      const mine = m.userId === CURRENT_USER.uid;
+      const canDelete = mine || canDeleteAny;
+      return `<div class="flex ${mine ? 'justify-end' : 'justify-start'} group">
+        <div class="max-w-[80%]">
+          <div class="${mine ? 'bg-[#D9A441] text-[#241705]' : 'bg-white/10 text-[#F6F1E7]'} rounded-2xl px-4 py-2">
+            ${!mine ? `<p class="text-xs font-semibold mb-0.5" style="color:${ROLE_COLORS[PROFILE.role] || '#D9A441'}">${escapeHtml(m.userName)}</p>` : ""}
+            <p class="text-sm">${escapeHtml(m.message)}</p>
+          </div>
+          ${canDelete ? `<button data-delmsg="${m.id}" class="text-[10px] text-[#63769a] hover:text-[#B4553A] mt-0.5 ${mine ? 'float-right' : ''}">Futa</button>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+    box.scrollTop = box.scrollHeight;
+    box.querySelectorAll("[data-delmsg]").forEach(b => {
+      b.onclick = () => db.collection("chat").doc(b.dataset.delmsg).delete();
+    });
+  });
+  UNSUBS.push(unsub);
+}
+
+/* =========================================================
+   KURASA ZETU (Dynamic sections)
+========================================================= */
+function renderKurasa() {
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="fade-in space-y-6 max-w-3xl">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">Kurasa Zetu</h2>
+      <p class="text-[#9fb0c7] text-sm mt-1">Kurasa maalum zilizotengenezwa na uongozi.</p>
+    </div>
+
+    ${isLeader() ? `
+    <div class="glass rounded-2xl p-5 space-y-3">
+      <h3 class="font-semibold text-sm text-[#9fb0c7]">Unda Ukurasa Mpya</h3>
+      <input id="secTitle" type="text" placeholder="Kichwa cha ukurasa" class="input-field w-full px-4 py-2.5 text-sm">
+      <textarea id="secContent" placeholder="Maudhui..." class="input-field w-full px-4 py-2.5 text-sm" rows="3"></textarea>
+      <button id="secSaveBtn" class="btn-gold px-4 py-2 rounded-lg text-sm">Chapisha Ukurasa</button>
+    </div>` : ""}
+
+    <div id="secList" class="space-y-3"></div>
+  </div>`;
+
+  if (isLeader()) {
+    document.getElementById("secSaveBtn").onclick = async () => {
+      const title = document.getElementById("secTitle").value.trim();
+      const content = document.getElementById("secContent").value.trim();
+      if (!title) { alert("Weka kichwa cha ukurasa."); return; }
+      await db.collection("sections").add({
+        title, content, createdBy: PROFILE.name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      document.getElementById("secTitle").value = "";
+      document.getElementById("secContent").value = "";
+    };
+  }
+
+  const unsub = db.collection("sections").orderBy("createdAt","desc").onSnapshot(snap => {
+    const list = document.getElementById("secList");
+    if (!list) return;
+    if (snap.empty) { list.innerHTML = `<p class="text-[#63769a] text-sm">Bado hakuna kurasa zilizotengenezwa.</p>`; return; }
+    list.innerHTML = snap.docs.map(d => {
+      const s = d.data();
+      return `<div class="glass rounded-2xl p-5">
+        <div class="flex items-center justify-between">
+          <h4 class="font-display font-semibold">${escapeHtml(s.title)}</h4>
+          ${isLeader() ? `<button data-del="${d.id}" class="text-xs text-[#B4553A] hover:underline">Futa</button>` : ""}
+        </div>
+        <p class="text-sm text-[#9fb0c7] mt-2 whitespace-pre-wrap">${escapeHtml(s.content||'')}</p>
+        <p class="text-xs text-[#63769a] mt-3">Imetengenezwa na ${escapeHtml(s.createdBy)}</p>
+      </div>`;
+    }).join("");
+    if (isLeader()) {
+      list.querySelectorAll("[data-del]").forEach(b => {
+        b.onclick = () => { if (confirm("Futa ukurasa huu?")) db.collection("sections").doc(b.dataset.del).delete(); };
+      });
+    }
+  });
+  UNSUBS.push(unsub);
+}
+
+/* =========================================================
+   PROFILE
+========================================================= */
+function renderProfile() {
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="fade-in max-w-lg space-y-6">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">Wasifu Wangu</h2>
+    </div>
+    <div class="glass rounded-2xl p-6 text-center">
+      <img id="profileImg" src="${PROFILE.photoURL || placeholderAvatar(PROFILE.name)}" class="w-24 h-24 rounded-full object-cover mx-auto mb-4 border-2 border-[#D9A441]">
+      <input type="file" id="photoInput" accept="image/*" class="hidden">
+      <button id="uploadPhotoBtn" class="btn-ghost text-xs px-4 py-2 rounded-lg">Badilisha Picha</button>
+      <p id="uploadStatus" class="text-xs text-[#9fb0c7] mt-2"></p>
+    </div>
+    <div class="glass rounded-2xl p-6 space-y-3">
+      <div><p class="text-xs text-[#9fb0c7]">Jina</p><p class="font-medium">${escapeHtml(PROFILE.name)}</p></div>
+      <div><p class="text-xs text-[#9fb0c7]">Barua Pepe</p><p class="font-medium">${escapeHtml(PROFILE.email)}</p></div>
+      <div><p class="text-xs text-[#9fb0c7]">Cheo</p>
+        <span class="badge" style="background:${ROLE_COLORS[PROFILE.role]}22;color:${ROLE_COLORS[PROFILE.role]};border:1px solid ${ROLE_COLORS[PROFILE.role]}55">${PROFILE.role}</span>
+      </div>
+    </div>
+  </div>`;
+
+  document.getElementById("uploadPhotoBtn").onclick = () => document.getElementById("photoInput").click();
+  document.getElementById("photoInput").onchange = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+    const status = document.getElementById("uploadStatus");
+    status.textContent = "Inapakia picha...";
+    try {
+      const ref = storage.ref().child(`profile_photos/${CURRENT_USER.uid}`);
+      await ref.put(file);
+      const url = await ref.getDownloadURL();
+      await db.collection("users").doc(CURRENT_USER.uid).update({ photoURL: url });
+      PROFILE.photoURL = url;
+      document.getElementById("profileImg").src = url;
+      status.textContent = "Picha imesasishwa.";
+    } catch (err) {
+      status.textContent = "Imeshindikana kupakia picha.";
+    }
+  };
+}
+
+function placeholderAvatar(name) {
+  const initial = (name || "?").charAt(0).toUpperCase();
+  return `data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='100' height='100'><rect width='100' height='100' fill='%23182A42'/><text x='50' y='58' font-size='40' fill='%23D9A441' text-anchor='middle' font-family='sans-serif'>${initial}</text></svg>`;
+}
+
+/* =========================================================
+   USALAMA (PIN change)
+========================================================= */
+function renderUsalama() {
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="fade-in max-w-md space-y-6">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">Usalama wa Akaunti</h2>
+      <p class="text-[#9fb0c7] text-sm mt-1">Weka PIN yako binafsi ya usalama (namba 4).</p>
+    </div>
+    <div class="glass rounded-2xl p-6 space-y-3">
+      <input id="pinCurrent" type="password" maxlength="4" inputmode="numeric" placeholder="PIN ya sasa (kama upo)" class="input-field w-full px-4 py-2.5 text-sm">
+      <input id="pinNew" type="password" maxlength="4" inputmode="numeric" placeholder="PIN mpya (namba 4)" class="input-field w-full px-4 py-2.5 text-sm">
+      <button id="pinSaveBtn" class="btn-gold px-4 py-2 rounded-lg text-sm">Hifadhi PIN</button>
+      <p id="pinMsg" class="text-xs"></p>
+    </div>
+  </div>`;
+
+  document.getElementById("pinSaveBtn").onclick = async () => {
+    const cur = document.getElementById("pinCurrent").value.trim();
+    const next = document.getElementById("pinNew").value.trim();
+    const msg = document.getElementById("pinMsg");
+    if (PROFILE.securityPin && cur !== PROFILE.securityPin) {
+      msg.textContent = "PIN ya sasa si sahihi."; msg.className = "text-xs text-[#D97757]"; return;
+    }
+    if (!/^\d{4}$/.test(next)) {
+      msg.textContent = "PIN mpya lazima iwe namba 4."; msg.className = "text-xs text-[#D97757]"; return;
+    }
+    await db.collection("users").doc(CURRENT_USER.uid).update({ securityPin: next });
+    PROFILE.securityPin = next;
+    msg.textContent = "PIN imesasishwa kwa mafanikio."; msg.className = "text-xs text-[#4C7A5A]";
+    document.getElementById("pinCurrent").value = "";
+    document.getElementById("pinNew").value = "";
+  };
+}
+
+/* =========================================================
+   USIMAMIZI (Leader panel)
+========================================================= */
+function renderUsimamizi() {
+  const main = document.getElementById("mainContent");
+  main.innerHTML = `<div class="fade-in space-y-6 max-w-3xl">
+    <div>
+      <h2 class="font-display text-2xl font-semibold">Paneli ya Uongozi</h2>
+      <p class="text-[#9fb0c7] text-sm mt-1">Zana za pekee kwa Mwenyekiti, Katibu na Mhazini.</p>
+    </div>
+
+    ${PROFILE.role === "Mwenyekiti" ? `
+    <div class="glass rounded-2xl p-5 space-y-3">
+      <h3 class="font-semibold text-sm text-[#9fb0c7]">Tangazo la Dharura (Emergency Alert)</h3>
+      <textarea id="emergMsg" placeholder="Andika tangazo la dharura kwa wanachama wote..." class="input-field w-full px-4 py-2.5 text-sm" rows="2"></textarea>
+      <button id="emergSendBtn" class="px-4 py-2 rounded-lg text-sm text-white" style="background:#B4553A">Tuma Tangazo la Dharura</button>
+    </div>` : ""}
+
+    <div class="glass rounded-2xl p-5">
+      <div class="flex items-center justify-between mb-3">
+        <h3 class="font-semibold text-sm text-[#9fb0c7]">Orodha ya Wanachama</h3>
+        ${PROFILE.role === "Mwenyekiti" ? `<span class="text-[10px] text-[#63769a]">Mwenyekiti pekee anaweza kuondoa mwanachama</span>` : ""}
+      </div>
+      <div id="memberList" class="space-y-2"></div>
+    </div>
+  </div>`;
+
+  if (PROFILE.role === "Mwenyekiti") {
+    document.getElementById("emergSendBtn").onclick = async () => {
+      const message = document.getElementById("emergMsg").value.trim();
+      if (!message) return;
+      await db.collection("announcements").add({
+        message, createdBy: PROFILE.name, createdAt: firebase.firestore.FieldValue.serverTimestamp()
+      });
+      document.getElementById("emergMsg").value = "";
+      alert("Tangazo limetumwa kwa wanachama wote.");
+    };
+  }
+
+  const unsub = db.collection("users").orderBy("createdAt","desc").onSnapshot(snap => {
+    const list = document.getElementById("memberList");
+    if (!list) return;
+    const canRemove = PROFILE.role === "Mwenyekiti";
+    list.innerHTML = snap.docs.map(d => {
+      const u = d.data();
+      const isSelf = d.id === CURRENT_USER.uid;
+      return `<div class="flex items-center justify-between border-b hairline pb-2 gap-2 flex-wrap">
+        <div class="flex items-center gap-3">
+          <img src="${u.photoURL || placeholderAvatar(u.name)}" class="w-8 h-8 rounded-full object-cover">
+          <div>
+            <p class="text-sm font-medium">${escapeHtml(u.name)}</p>
+            <p class="text-xs text-[#63769a]">${escapeHtml(u.email)}</p>
+          </div>
+        </div>
+        <div class="flex items-center gap-2">
+          <span class="badge" style="background:${ROLE_COLORS[u.role]}22;color:${ROLE_COLORS[u.role]};border:1px solid ${ROLE_COLORS[u.role]}55">${u.role}</span>
+          ${canRemove && !isSelf ? `<button data-removeuser="${d.id}" class="text-xs text-[#B4553A] hover:underline">Ondoa</button>` : ""}
+        </div>
+      </div>`;
+    }).join("");
+    if (canRemove) {
+      list.querySelectorAll("[data-removeuser]").forEach(b => {
+        b.onclick = async () => {
+          if (!confirm("Una uhakika unataka kumwondoa mwanachama huyu kwenye ukoo? Wasifu wake utafutwa.")) return;
+          await db.collection("users").doc(b.dataset.removeuser).delete();
+          alert("Mwanachama ameondolewa kwenye orodha. Kumbuka: akaunti yake ya kuingia (Auth) haitofutika moja kwa moja kwa sababu za kiusalama za Firebase � hilo linahitaji Cloud Function ya ziada tukihitaji baadaye.");
+        };
+      });
+    }
+  });
+  UNSUBS.push(unsub);
+}
+
+/* =========================================================
+   UTIL
+========================================================= */
+function escapeHtml(str) {
+  if (!str) return "";
+  return String(str)
+    .replaceAll("&","&amp;").replaceAll("<","&lt;").replaceAll(">","&gt;")
+    .replaceAll('"',"&quot;").replaceAll("'","&#039;");
+}
+</script>
+</body>
+</html>
